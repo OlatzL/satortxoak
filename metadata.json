@@ -1,0 +1,5 @@
+{
+  "name": "Satortxoak",
+  "description": "A high-intensity, reaction-based Whack-a-Mole game designed for large-scale interactive touch walls. Supports 1 or 2 players.",
+  "requestFramePermissions": []
+}

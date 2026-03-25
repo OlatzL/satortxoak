@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Satortxoak: Reaction Challenge</title>
+    <!-- Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        /* --- DESIGN SYSTEM & BASE STYLES --- */
+        :root {
+            --bg-color: #0a0a0c;
+            --hole-color: #1a1a1f;
+            --mole-color: #f27d26;
+            --p1-color: #00ff88;
+            --p2-color: #00d1ff;
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --grid-gap: 4vw;
+            --hole-size: 20vh;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            touch-action: none; /* Prevent browser zoom/pan */
+        }
+
+        /* --- LAYOUT --- */
+        #app-container {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-rows: 150px 1fr 100px;
+            padding: 40px;
+            max-width: 2400px; /* Constrain for ultrawide but allow scale */
+            margin: 0 auto;
+        }
+
+        /* --- HEADER: SCORES --- */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 60px;
+        }
+
+        .score-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 300px;
+        }
+
+        .score-label {
+            font-size: 1.5vw;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--text-secondary);
+            margin-bottom: 1vh;
+        }
+
+        .score-value {
+            font-size: 8vw;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        #p1-score-val { color: var(--p1-color); }
+        #p2-score-val { color: var(--p2-color); }
+
+        .timer-display {
+            text-align: center;
+        }
+
+        #time-left {
+            font-size: 6vw;
+            font-weight: 300;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* --- GAME GRID --- */
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: var(--grid-gap);
+            justify-items: center;
+            align-items: center;
+            perspective: 1000px;
+        }
+
+        .hole {
+            width: var(--hole-size);
+            height: var(--hole-size);
+            background: var(--hole-color);
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 10px 20px rgba(0,0,0,0.8), 0 2px 4px rgba(255,255,255,0.05);
+            border: 4px solid rgba(255,255,255,0.05);
+        }
+
+        .mole {
+            width: 80%;
+            height: 80%;
+            background: var(--mole-color);
+            border-radius: 50% 50% 20% 20%;
+            position: absolute;
+            bottom: -100%;
+            left: 10%;
+            transition: bottom 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 -10px 30px rgba(242, 125, 38, 0.4);
+        }
+
+        /* Eyes for the mole */
+        .mole::before, .mole::after {
+            content: '';
+            width: 15px;
+            height: 15px;
+            background: #000;
+            border-radius: 50%;
+            position: absolute;
+            top: 30%;
+        }
+        .mole::before { left: 30%; }
+        .mole::after { right: 30%; }
+
+        .mole.active {
+            bottom: 10%;
+        }
+
+        .mole.hit {
+            background: #fff;
+            transform: scale(0.9);
+            transition: transform 0.1s;
+        }
+
+        /* --- OVERLAYS --- */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 12, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: opacity 0.5s;
+        }
+
+        .hidden {
+            display: none;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        h1 {
+            font-size: 10vw;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: -0.02em;
+            margin-bottom: 2vh;
+            background: linear-gradient(to bottom, #fff, #666);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .menu-options {
+            display: flex;
+            gap: 40px;
+            margin-top: 60px;
+        }
+
+        .btn {
+            padding: 2vw 4vw;
+            font-size: 2vw;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border: none;
+            border-radius: 100px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            min-width: 20vw;
+        }
+
+        .btn-primary {
+            background: var(--p1-color);
+            color: #000;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #fff;
+            border: 4px solid #fff;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .instruction {
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            margin-top: 20px;
+        }
+
+        /* --- FEEDBACK ANIMATIONS --- */
+        @keyframes scorePop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+
+        .pop {
+            animation: scorePop 0.3s ease-out;
+        }
+
+        /* Floating point indicator */
+        .floating-score {
+            position: absolute;
+            font-weight: 900;
+            font-size: 3rem;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            z-index: 50;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-150px); opacity: 0; }
+        }
+
+        .btn-restart {
+            position: fixed;
+            bottom: 4vw;
+            right: 4vw;
+            padding: 1.5vw 3vw;
+            font-size: 1.2vw;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 100px;
+            cursor: pointer;
+            z-index: 80;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .btn-restart:active {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <!-- Header -->
+        <header class="game-header">
+            <div class="score-card" id="p1-card">
+                <span class="score-label">1. Jokalaria</span>
+                <span class="score-value" id="p1-score-val">0</span>
+            </div>
+
+            <div class="timer-display">
+                <span class="score-label">Denbora</span>
+                <div id="time-left">60</div>
+            </div>
+
+            <div class="score-card" id="p2-card">
+                <span class="score-label">2. Jokalaria</span>
+                <span class="score-value" id="p2-score-val">0</span>
+            </div>
+        </header>
+
+        <!-- Board -->
+        <main class="game-board" id="board">
+            <!-- 9 Holes generated by JS -->
+        </main>
+
+        <!-- Footer / Status -->
+        <footer style="display: flex; justify-content: center; align-items: center;">
+            <p class="instruction">Sakatu satorrak ahalik eta azkarren!</p>
+        </footer>
+
+        <button id="restart-btn" class="btn-restart hidden" onclick="quitGame()">Berrekin</button>
+    </div>
+
+    <!-- Start Menu -->
+    <div id="start-menu" class="overlay">
+        <h1>Satortxoak</h1>
+        <p class="instruction">ezetz guztiak harrapatu!</p>
+        <div class="menu-options">
+            <button class="btn btn-primary" onclick="startGame(1)">Jokalari 1</button>
+            <button class="btn btn-secondary" onclick="startGame(2)">2 Jokalari</button>
+        </div>
+    </div>
+
+    <!-- Game Over Menu -->
+    <div id="game-over" class="overlay hidden">
+        <h1 id="winner-text">Jokoa amaitu da</h1>
+        <div id="final-scores" style="display: flex; gap: 100px; margin-bottom: 40px;">
+            <div class="score-card">
+                <span class="score-label">1. Jokalaria</span>
+                <span class="score-value" id="final-p1">0</span>
+            </div>
+            <div class="score-card" id="final-p2-card">
+                <span class="score-label">2. Jokalaria</span>
+                <span class="score-value" id="final-p2">0</span>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="resetToMenu()">Menu nagusia</button>
+    </div>
+
+    <script>
+        /* --- STATE MANAGEMENT --- */
+        const state = {
+            gameActive: false,
+            players: 1,
+            scores: { p1: 0, p2: 0 },
+            timeLeft: 60,
+            moleSpawnRate: 1000, // ms
+            moleVisibleDuration: 800, // ms
+            activeMoleIndex: null,
+            spawnTimer: null,
+            countdownTimer: null,
+            lastSpawnTime: 0,
+            maxPoints: 100,
+            difficultyCurve: 0.98 // Speed up over time
+        };
+
+        const board = document.getElementById('board');
+        const p1ScoreEl = document.getElementById('p1-score-val');
+        const p2ScoreEl = document.getElementById('p2-score-val');
+        const timeLeftEl = document.getElementById('time-left');
+        const startMenu = document.getElementById('start-menu');
+        const gameOverMenu = document.getElementById('game-over');
+        const restartBtn = document.getElementById('restart-btn');
+
+        /* --- INITIALIZATION --- */
+        function initBoard() {
+            board.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                const hole = document.createElement('div');
+                hole.className = 'hole';
+                hole.dataset.index = i;
+
+                const mole = document.createElement('div');
+                mole.className = 'mole';
+                mole.id = `mole-${i}`;
+                
+                // Use pointerdown for fastest response on touch/mouse
+                mole.addEventListener('pointerdown', (e) => handleWhack(e, i));
+
+                hole.appendChild(mole);
+                board.appendChild(hole);
+            }
+        }
+
+        /* --- GAME LOGIC --- */
+        function startGame(numPlayers) {
+            state.players = numPlayers;
+            state.scores = { p1: 0, p2: 0 };
+            state.timeLeft = 60;
+            state.gameActive = true;
+            state.moleSpawnRate = 1200;
+            state.moleVisibleDuration = 1000;
+
+            // UI Updates
+            p1ScoreEl.textContent = '0';
+            p2ScoreEl.textContent = '0';
+            timeLeftEl.textContent = state.timeLeft;
+            startMenu.classList.add('hidden');
+            gameOverMenu.classList.add('hidden');
+            restartBtn.classList.remove('hidden');
+
+            // Show/Hide P2 card
+            const p2Card = document.getElementById('p2-card');
+            p2Card.style.visibility = (numPlayers === 2) ? 'visible' : 'hidden';
+
+            initBoard();
+            startTimers();
+            spawnMole();
+        }
+
+        function startTimers() {
+            state.countdownTimer = setInterval(() => {
+                state.timeLeft--;
+                timeLeftEl.textContent = state.timeLeft;
+
+                // Difficulty scaling
+                state.moleSpawnRate *= state.difficultyCurve;
+                state.moleVisibleDuration *= state.difficultyCurve;
+
+                if (state.timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function spawnMole() {
+            if (!state.gameActive) return;
+
+            // Hide previous mole if any
+            if (state.activeMoleIndex !== null) {
+                const prevMole = document.getElementById(`mole-${state.activeMoleIndex}`);
+                prevMole.classList.remove('active');
+            }
+
+            // Pick new random hole
+            let newIndex;
+            do {
+                newIndex = Math.floor(Math.random() * 9);
+            } while (newIndex === state.activeMoleIndex);
+
+            state.activeMoleIndex = newIndex;
+            state.lastSpawnTime = Date.now();
+
+            const mole = document.getElementById(`mole-${newIndex}`);
+            mole.classList.remove('hit');
+            mole.classList.add('active');
+
+            // Auto-hide mole after duration
+            state.spawnTimer = setTimeout(() => {
+                if (state.activeMoleIndex === newIndex) {
+                    mole.classList.remove('active');
+                    // Spawn next after a small gap
+                    setTimeout(spawnMole, 200);
+                }
+            }, state.moleVisibleDuration);
+        }
+
+        function handleWhack(e, index) {
+            if (!state.gameActive || index !== state.activeMoleIndex) return;
+
+            const mole = e.currentTarget;
+            if (mole.classList.contains('hit')) return;
+
+            // Calculate reaction time points
+            const reactionTime = Date.now() - state.lastSpawnTime;
+            const points = Math.max(10, Math.round(state.maxPoints * (1 - (reactionTime / state.moleVisibleDuration))));
+
+            // Determine which player hit it
+            // On a multitouch wall, we can't easily know "who" touched unless we split zones
+            // But for this game, we'll assume the touch event's location or just alternate/competitive
+            // In a real installation, you might have P1 on left 4.5 holes and P2 on right 4.5 holes
+            // OR we use the touch identifier.
+            // For simplicity in this demo: we'll check the X coordinate of the touch.
+            const touchX = e.clientX;
+            const isP2 = state.players === 2 && touchX > window.innerWidth / 2;
+            const playerKey = isP2 ? 'p2' : 'p1';
+
+            state.scores[playerKey] += points;
+            
+            // Visual Feedback
+            mole.classList.add('hit');
+            mole.classList.remove('active');
+            
+            const scoreEl = isP2 ? p2ScoreEl : p1ScoreEl;
+            scoreEl.textContent = state.scores[playerKey];
+            scoreEl.classList.add('pop');
+            setTimeout(() => scoreEl.classList.remove('pop'), 300);
+
+            showFloatingScore(e.clientX, e.clientY, points, isP2 ? 'var(--p2-color)' : 'var(--p1-color)');
+
+            // Clear spawn timer and spawn next immediately
+            clearTimeout(state.spawnTimer);
+            state.activeMoleIndex = null;
+            setTimeout(spawnMole, 100);
+        }
+
+        function showFloatingScore(x, y, points, color) {
+            const el = document.createElement('div');
+            el.className = 'floating-score';
+            el.textContent = `+${points}`;
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+            el.style.color = color;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        function endGame() {
+            state.gameActive = false;
+            clearInterval(state.countdownTimer);
+            clearTimeout(state.spawnTimer);
+            restartBtn.classList.add('hidden');
+
+            // Hide all moles
+            document.querySelectorAll('.mole').forEach(m => m.classList.remove('active'));
+
+            // Show Game Over
+            gameOverMenu.classList.remove('hidden');
+            document.getElementById('final-p1').textContent = state.scores.p1;
+            
+            const fP2Card = document.getElementById('final-p2-card');
+            if (state.players === 2) {
+                fP2Card.style.display = 'flex';
+                document.getElementById('final-p2').textContent = state.scores.p2;
+                
+                if (state.scores.p1 > state.scores.p2) {
+                    document.getElementById('winner-text').textContent = '1. Jokalariak irabazi du!';
+                    triggerConfetti('var(--p1-color)');
+                } else if (state.scores.p2 > state.scores.p1) {
+                    document.getElementById('winner-text').textContent = '2. Jokalariak irabazi du!';
+                    triggerConfetti('var(--p2-color)');
+                } else {
+                    document.getElementById('winner-text').textContent = "Berdinketa!";
+                }
+            } else {
+                fP2Card.style.display = 'none';
+                document.getElementById('winner-text').textContent = 'Lan bikaina!';
+                triggerConfetti('#ffffff');
+            }
+        }
+
+        function triggerConfetti(color) {
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { y: 0.6 },
+                colors: [color, '#ffffff']
+            });
+        }
+
+        function resetToMenu() {
+            gameOverMenu.classList.add('hidden');
+            startMenu.classList.remove('hidden');
+        }
+
+        function quitGame() {
+            state.gameActive = false;
+            clearInterval(state.countdownTimer);
+            clearTimeout(state.spawnTimer);
+            document.querySelectorAll('.mole').forEach(m => m.classList.remove('active'));
+            restartBtn.classList.add('hidden');
+            startMenu.classList.remove('hidden');
+            gameOverMenu.classList.add('hidden');
+        }
+
+        // Initialize empty board on load
+        initBoard();
+
+    </script>
+</body>
+</html>
