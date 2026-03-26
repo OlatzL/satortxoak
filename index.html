@@ -452,8 +452,9 @@
             state.spawnTimer = setTimeout(() => {
                 if (state.activeMoleIndex === newIndex) {
                     mole.classList.remove('active');
-                    // Spawn next after a small gap
-                    setTimeout(spawnMole, 200);
+                    state.activeMoleIndex = null;
+                    // Spawn next after a small gap - store so it can be cancelled
+                    state.spawnTimer = setTimeout(spawnMole, 200);
                 }
             }, state.moleVisibleDuration);
         }
