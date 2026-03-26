@@ -499,9 +499,12 @@
                 state.timeLeft--;
                 timeLeftEl.textContent = state.timeLeft;
 
-                // Difficulty scaling
-                state.moleSpawnRate *= state.difficultyCurve;
-                state.moleVisibleDuration *= state.difficultyCurve;
+                // Difficulty scaling: freeze speed in the last 20 seconds
+                // so moles are still hittable and touches score correctly
+                if (state.timeLeft > 20) {
+                    state.moleSpawnRate *= state.difficultyCurve;
+                    state.moleVisibleDuration *= state.difficultyCurve;
+                }
 
                 if (state.timeLeft <= 0) {
                     endGame();
