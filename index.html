@@ -321,6 +321,55 @@
             border-color: rgba(255, 255, 255, 0.4);
         }
 
+        /* --- COVER MOLE --- */
+        .cover-mole-wrapper {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 4vh;
+        }
+
+        .cover-hole {
+            width: 25vmin;
+            height: 25vmin;
+            background: var(--hole-color);
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 10px 20px rgba(0,0,0,0.8), 0 2px 4px rgba(255,255,255,0.05);
+            border: 4px solid rgba(255,255,255,0.05);
+        }
+
+        .cover-mole-img {
+            width: 80%;
+            height: 80%;
+            background: var(--mole-color);
+            border-radius: 50% 50% 20% 20%;
+            position: absolute;
+            bottom: 10%;
+            left: 10%;
+            animation: coverMoleBounce 2s ease-in-out infinite;
+            box-shadow: 0 -10px 30px rgba(242, 125, 38, 0.4);
+        }
+
+        .cover-mole-img::before, .cover-mole-img::after {
+            content: '';
+            width: 15%;
+            height: 15%;
+            background: #000;
+            border-radius: 50%;
+            position: absolute;
+            top: 30%;
+        }
+
+        .cover-mole-img::before { left: 25%; }
+        .cover-mole-img::after { right: 25%; }
+
+        /* Mole gently bobs up and down in its hole */
+        @keyframes coverMoleBounce {
+            0%, 100% { bottom: 5%; }
+            50% { bottom: 18%; }
+        }
+
     </style>
 </head>
 <body>
@@ -371,6 +420,11 @@
 
     <!-- Start Menu -->
     <div id="start-menu" class="overlay">
+        <div class="cover-mole-wrapper">
+            <div class="cover-hole">
+                <div class="cover-mole-img"></div>
+            </div>
+        </div>
         <h1>Satortxoak</h1>
         <p class="instruction">ezetz guztiak harrapatu!</p>
         <div class="menu-options">
